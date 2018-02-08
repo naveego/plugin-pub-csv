@@ -34,7 +34,7 @@ var publishCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(publishCmd)
+	RootCmd.AddCommand(publishCmd)
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:

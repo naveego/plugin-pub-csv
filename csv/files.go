@@ -36,7 +36,7 @@ func prepareFilesForProcessing(path string) (tmpdir string, files []string, err 
 		return "", nil, err
 	}
 
-	u, _ := uuid.NewV4()
+	u := uuid.NewV4()
 	tmpdir = filepath.Join(os.TempDir(), "pub-csv", u.String())
 	if err = os.MkdirAll(tmpdir, 0777); err != nil {
 		return tmpdir, nil, fmt.Errorf("couldn't create temp directory %s: %s", tmpdir, err)

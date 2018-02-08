@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,8 +12,6 @@ import (
 	"github.com/vjeantet/jodaTime"
 
 	"github.com/sirupsen/logrus"
-
-	"github.com/satori/go.uuid"
 
 	"github.com/naveego/api/types/pipeline"
 	"github.com/naveego/navigator-go/publishers/protocol"
@@ -67,32 +64,14 @@ func (m *server) Dispose(protocol.DisposeRequest) (protocol.DisposeResponse, err
 func (m *server) Publish(request protocol.PublishRequest, toClient protocol.PublisherClient) (protocol.PublishResponse, error) {
 
 	response := protocol.PublishResponse{}
-	files, err := getResolvedFilePaths(m.settings.Path)
+	files, err := getAllMatchingFiles(m.settings.Path)
 	if err != nil {
 		return response, err
 	}
 
-	u, _ := uuid.NewV4()
-	var tmpdir = filepath.Join(os.TempDir(), u.String())
-	if err := os.Mkdir(tmpdir, 0777); err != nil {
-		return response, fmt.Errorf("couldn't create temp directory %s: %s", tmpdir, err)
-	}
-
-	var filesToProcess []string
-
-	for _, file := range files {
-		if strings.HasSuffix(file, ".zip") {
-			return response, fmt.Errorf("can't handle file %s, zip support not implemented yet", file)
-		}
-		u, _ = uuid.NewV4()
-		fileName := fmt.Sprintf("%s.%s", filepath.Base(file), u.String())
-		fileToProcess := filepath.Join(tmpdir, fileName)
-
-		if err := copyFileContents(file, fileToProcess); err != nil {
-			return response, fmt.Errorf("couldn't copy file %s to temp directory for processing: %s", fileToProcess, err)
-		}
-
-		filesToProcess = append(filesToProcess, fileToProcess)
+	tmpdir, filesToProcess, err := prepareFilesForProcessing(m.settings.Path)
+	if err != nil {
+		return response, err
 	}
 
 	go func() {
@@ -106,7 +85,7 @@ func (m *server) Publish(request protocol.PublishRequest, toClient protocol.Publ
 		}()
 
 		for _, file := range filesToProcess {
-			log := logrus.WithField("file", file)
+			log := logrus.WithField("file", unmanglePath(file))
 			log.Info("Processing file.")
 			if err := m.processFile(toClient, file, log); err != nil {
 				log.WithError(err).Error("Error while processing file.")
@@ -116,7 +95,7 @@ func (m *server) Publish(request protocol.PublishRequest, toClient protocol.Publ
 					Entity: m.settings.shapeSettings.Name,
 					Meta: map[string]string{
 						"csv:error": err.Error(),
-						"csv:file":  file,
+						"csv:file":  unmanglePath(file),
 					},
 				}
 
@@ -161,8 +140,8 @@ func (m *server) processFile(c protocol.PublisherClient, filePath string, log *l
 			return fmt.Errorf("error reading from file: %s", err)
 		}
 		if len(record) != len(cols) {
-			return fmt.Errorf("record in file %s had %d columns, but only %d columns are defined in shape",
-				filePath, len(record), len(cols))
+			return fmt.Errorf("record %d in file '%s' had %d columns, but %d columns are defined in shape",
+				count, unmanglePath(filePath), len(record), len(cols))
 		}
 
 		dp := pipeline.DataPoint{
@@ -235,7 +214,7 @@ func (m *server) TestConnection(request protocol.TestConnectionRequest) (protoco
 		return response, fmt.Errorf("couldn't decode settings: %s", err)
 	}
 
-	paths, err := getResolvedFilePaths(settings.Path)
+	paths, err := getAllMatchingFiles(settings.Path)
 
 	response.Success = len(paths) > 0 && err == nil
 
@@ -249,40 +228,4 @@ func (m *server) TestConnection(request protocol.TestConnectionRequest) (protoco
 
 	return response, err
 
-}
-
-func getResolvedFilePaths(path string) ([]string, error) {
-	if !filepath.IsAbs(path) {
-		return nil, fmt.Errorf("%s is not an absolute path", path)
-	}
-
-	files, err := filepath.Glob(path)
-	return files, err
-}
-
-// copyFileContents copies the contents of the file named src to the file named
-// by dst. The file will be created if it does not already exist. If the
-// destination file exists, all it's contents will be replaced by the contents
-// of the source file.
-func copyFileContents(src, dst string) (err error) {
-	in, err := os.Open(src)
-	if err != nil {
-		return
-	}
-	defer in.Close()
-	out, err := os.Create(dst)
-	if err != nil {
-		return
-	}
-	defer func() {
-		cerr := out.Close()
-		if err == nil {
-			err = cerr
-		}
-	}()
-	if _, err = io.Copy(out, in); err != nil {
-		return
-	}
-	err = out.Sync()
-	return
 }

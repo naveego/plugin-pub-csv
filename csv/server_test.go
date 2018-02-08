@@ -174,6 +174,34 @@ var _ = Describe("Server", func() {
 			Expect(actual).To(HaveLen(6))
 		})
 
+		It("Should emit abend when file isn't a valid csv", func() {
+			csvPath, _ = filepath.Abs("test_data/people.nonsense.csv")
+			settings.HasHeader = true
+
+			actual := execute()
+
+			Expect(actual).To(HaveLen(1))
+			Expect(actual[0].Action).To(Equal(pipeline.DataPointAction("abend")))
+		})
+
+		It("Should emit abend when file has wrong number of columns", func() {
+			csvPath, _ = filepath.Abs("test_data/people.1.header.misconfigured.csv")
+			settings.HasHeader = true
+
+			actual := execute()
+
+			Expect(actual).To(HaveLen(1))
+			Expect(actual[0].Action).To(Equal(pipeline.DataPointAction("abend")))
+		})
+
+		It("Should handle zip correctly", func() {
+			csvPath, _ = filepath.Abs("test_data/people.2.header.zip")
+
+			actual := execute()
+
+			Expect(actual).To(HaveLen(6))
+		})
+
 		It("Should emit data points with errors when data is malformed", func() {
 			csvPath, _ = filepath.Abs("test_data/people.1.header.malformed.csv")
 

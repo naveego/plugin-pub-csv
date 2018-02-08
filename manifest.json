@@ -1,0 +1,41 @@
+{
+    "name": "pub-csv",
+    "displayName": "CSV Publisher",
+    "description": "Publisher which extracts data from CSV (RFC 4180) files.",
+    "versionDescription": "Version 1",
+    "version": "1.0.0",
+    "iconFile": "icon.png",
+    "executable": "plugin-pub-csv",
+    "kind": "publisher",
+    "configSchema": [
+        {
+            "name": "path",
+            "label": "Path",
+            "help": "Absolute path to file(s), supports *",
+            "type": "string"
+        },
+        {
+            "name": "archivePath",
+            "label": "Archive Path",
+            "help": "If set, the publisher will move each file to this directory after it has been processed.",
+            "type": "string"
+        },
+        {
+            "name": "hasHeader",
+            "label": "File has header row",
+            "type": "checkbox"
+        },
+        {
+            "name": "delimiter",
+            "label": "Delimiter",
+            "type": "string",
+            "default": ","
+        },
+        {
+            "name": "shape",
+            "label": "Shape",
+            "help": "{    \"name\": \"Name\",    \"keys\": [\"a\",\"b\"],    \"properties\": [        { \"name\": \"x\", \"type\":\"date\", \"format\": \"MM/dd/yyyy\" },    ]}",
+            "type": "shape"
+        }
+    ]
+}

@@ -9,10 +9,12 @@ import (
 	"os/exec"
 	"regexp"
 
+	"bitbucket.org/naveego/ci/go/build"
+
 	"github.com/naveego/plugin-pub-csv/version"
 
-	"github.com/magefile/mage/mg" // mg contains helpful utility functions, like Deps
-	"github.com/magefile/mage/sh" // mg contains helpful utility functions, like Deps
+	"github.com/magefile/mage/mg"
+	"github.com/magefile/mage/sh"
 )
 
 var oses = []string{"linux", "darwin", "windows"}
@@ -72,9 +74,7 @@ func buildAndPublish(os string) error {
 		return err
 	}
 
-	if err := sh.Run("navget-cli", "publish", "--os", os, "-f", "plugin-pub-csv icon.png"); err != nil {
-		return err
-	}
+	build.PublishToNavget(os, "amd64", []string{"plugin-pub-csv", "icon.png"})
 
 	return nil
 }

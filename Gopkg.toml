@@ -20,10 +20,7 @@
 #  name = "github.com/x/y"
 #  version = "2.4.0"
 
-
-[[constraint]]
-  name = "github.com/magefile/mage"
-  version = "2.0.1"
+ignored = ["bitbucket.org/naveego/ci/build"]
 
 [[constraint]]
   branch = "master"

@@ -17,7 +17,7 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
-var oses = []string{"linux", "darwin", "windows"}
+var oses = []string{"windows", "linux", "darwin"}
 
 // Default target to run when none is specified
 // If not set, running mage will list available targets

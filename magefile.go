@@ -5,9 +5,11 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"regexp"
+	"time"
 
 	"github.com/naveego/plugin-pub-csv/version"
 
@@ -73,6 +75,11 @@ func buildAndPublish(os string) error {
 	}
 
 	if err := sh.Run("navget-cli", "publish", "--os", os, "-f", "plugin-pub-csv icon.png"); err != nil {
+		log.Printf("Error publishing plugin. Will wait 5 seconds and try again. Error was: %s", err)
+		<-time.After(time.Second * 5)
+		if err = sh.Run("navget-cli", "publish", "--os", os, "-f", "plugin-pub-csv icon.png"); err != nil {
+			return err
+		}
 		return err
 	}
 

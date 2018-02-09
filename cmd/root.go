@@ -8,7 +8,6 @@ import (
 
 	"github.com/naveego/navigator-go/publishers/server"
 	"github.com/naveego/plugin-pub-csv/csv"
-	"github.com/naveego/plugin-pub-csv/version"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -20,8 +19,7 @@ var RootCmd = &cobra.Command{
 	Use:   "plugin-pub-csv",
 	Short: "A publisher that pulls data from a CSV file.",
 	Args:  cobra.ExactArgs(1),
-	Long: fmt.Sprintf(`Version %s
-Runs the publisher in externally controlled mode.`, version.Version.String()),
+	Long:  `Runs the publisher in externally controlled mode.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		logrus.SetOutput(os.Stdout)

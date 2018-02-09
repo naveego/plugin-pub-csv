@@ -11,8 +11,6 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/naveego/plugin-pub-csv/version"
-
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )
@@ -44,16 +42,16 @@ func buildForOS(os string) error {
 
 func PublishToNavget() error {
 
-	ver := fmt.Sprintf(`"version": "%s",`, version.Version.String())
+	//ver := fmt.Sprintf(`"version": "%s",`, version.Version.String())
 
-	manifest, err := replaceInFile("manifest.json", `"version":.*,`, ver)
-	if err != nil {
-		return err
-	}
-	defer ioutil.WriteFile("manifest.json", []byte(manifest), 0777)
+	// manifest, err := replaceInFile("manifest.json", `"version":.*,`, ver)
+	// if err != nil {
+	// 	return err
+	// }
+	// defer ioutil.WriteFile("manifest.json", []byte(manifest), 0777)
 
 	for _, os := range oses {
-		if err = buildAndPublish(os); err != nil {
+		if err := buildAndPublish(os); err != nil {
 			return err
 		}
 	}

@@ -60,7 +60,7 @@ func PublishToNavget() error {
 }
 
 func buildAndPublish(os string) error {
-	defer sh.Rm("plugin-pub-csv")
+	defer sh.Rm("plugin-pub-csv.exe")
 	defer sh.Rm("package.zip")
 
 	env := map[string]string{
@@ -68,14 +68,14 @@ func buildAndPublish(os string) error {
 		"CGO_ENABLED": "0",
 	}
 
-	if err := sh.RunWith(env, "go", "build", "-o", "plugin-pub-csv", "."); err != nil {
+	if err := sh.RunWith(env, "go", "build", "-o", "plugin-pub-csv.exe", "."); err != nil {
 		return err
 	}
 
-	if err := sh.Run("navget-cli", "publish", "--os", os, "-f", "plugin-pub-csv icon.png"); err != nil {
+	if err := sh.Run("navget-cli", "publish", "--os", os, "-f", "plugin-pub-csv.exe icon.png"); err != nil {
 		log.Printf("Error publishing plugin. Will wait 5 seconds and try again. Error was: %s", err)
 		<-time.After(time.Second * 5)
-		if err = sh.Run("navget-cli", "publish", "--os", os, "-f", "plugin-pub-csv icon.png"); err != nil {
+		if err = sh.Run("navget-cli", "publish", "--os", os, "-f", "plugin-pub-csv.exe icon.png"); err != nil {
 			return err
 		}
 		return err

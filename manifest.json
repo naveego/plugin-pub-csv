@@ -5,7 +5,7 @@
     "versionDescription": "Version 1",
     "version": "0.0.1",
     "iconFile": "icon.png",
-    "executable": "plugin-pub-csv",
+    "executable": "plugin-pub-csv.exe",
     "kind": "publisher",
     "configSchema": {
         "ui": {

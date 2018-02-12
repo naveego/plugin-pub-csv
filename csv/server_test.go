@@ -1,7 +1,6 @@
 package csv_test
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"time"
@@ -26,21 +25,21 @@ var _ = Describe("Server", func() {
 	BeforeEach(func() {
 		sut = NewServer()
 		csvPath, _ = filepath.Abs("test_data/people.3.header.csv")
-		shape, _ := json.Marshal(ShapeSettings{
-			Name: "TestShape",
-			Keys: []string{"first", "natural"},
-			Columns: []ShapeColumn{
-				{Name: "first", Type: "string"},
-				{Name: "last", Type: "string"},
-				{Name: "age", Type: "number"},
-				{Name: "date", Type: "date", Format: "MM/dd/yyyy"},
-				{Name: "natural", Type: "number"},
-			},
-		})
+
 		settings = Settings{
 			Path:      csvPath,
 			HasHeader: true,
-			Shape:     string(shape),
+			Shape: ShapeSettings{
+				Name: "TestShape",
+				Keys: []string{"first", "natural"},
+				Columns: []ShapeColumn{
+					{Name: "first", Type: "string"},
+					{Name: "last", Type: "string"},
+					{Name: "age", Type: "number"},
+					{Name: "date", Type: "date", Format: "MM/dd/yyyy"},
+					{Name: "natural", Type: "number"},
+				},
+			},
 		}
 	})
 

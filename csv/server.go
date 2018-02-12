@@ -45,9 +45,9 @@ func (m *server) Init(request protocol.InitRequest) (protocol.InitResponse, erro
 	}
 	m.settings = settings
 	m.dataPointShape = pipeline.Shape{
-		KeyNames: m.settings.shapeSettings.Keys,
+		KeyNames: m.settings.Shape.Keys,
 	}
-	for _, p := range m.settings.shapeSettings.Columns {
+	for _, p := range m.settings.Shape.Columns {
 		m.dataPointShape.Properties = append(m.dataPointShape.Properties, fmt.Sprintf("%s:%s", p.Name, p.Type))
 	}
 
@@ -92,7 +92,7 @@ func (m *server) Publish(request protocol.PublishRequest, toClient protocol.Publ
 				dp := pipeline.DataPoint{
 					Action: "abend",
 					Shape:  m.dataPointShape,
-					Entity: m.settings.shapeSettings.Name,
+					Entity: m.settings.Shape.Name,
 					Meta: map[string]string{
 						"csv:error": err.Error(),
 						"csv:file":  unmanglePath(file),
@@ -114,7 +114,7 @@ func (m *server) Publish(request protocol.PublishRequest, toClient protocol.Publ
 
 func (m *server) processFile(c protocol.PublisherClient, filePath string, log *logrus.Entry) error {
 
-	cols := m.settings.shapeSettings.Columns
+	cols := m.settings.Shape.Columns
 
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -147,7 +147,7 @@ func (m *server) processFile(c protocol.PublisherClient, filePath string, log *l
 		dp := pipeline.DataPoint{
 			Action: "upsert",
 			Shape:  m.dataPointShape,
-			Entity: m.settings.shapeSettings.Name,
+			Entity: m.settings.Shape.Name,
 			Data:   make(map[string]interface{}),
 		}
 
@@ -191,10 +191,10 @@ func (m *server) DiscoverShapes(request protocol.DiscoverShapesRequest) (protoco
 	}
 
 	sd := pipeline.ShapeDefinition{
-		Name: settings.shapeSettings.Name,
-		Keys: settings.shapeSettings.Keys,
+		Name: settings.Shape.Name,
+		Keys: settings.Shape.Keys,
 	}
-	for _, col := range settings.shapeSettings.Columns {
+	for _, col := range settings.Shape.Columns {
 		sd.Properties = append(sd.Properties, pipeline.PropertyDefinition{
 			Name: col.Name,
 			Type: col.Type,

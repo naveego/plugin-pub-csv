@@ -1,7 +1,6 @@
 package csv
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -9,12 +8,11 @@ import (
 )
 
 type Settings struct {
-	Path          string `json:"path"`
-	ArchivePath   string `json:"archivePath"`
-	HasHeader     bool   `json:"hasHeader"`
-	Delimiter     string `json:"delimiter"`
-	Shape         string `json:"shape"`
-	shapeSettings ShapeSettings
+	Path        string `json:"path"`
+	ArchivePath string `json:"archivePath"`
+	HasHeader   bool   `json:"hasHeader"`
+	Delimiter   string `json:"delimiter"`
+	Shape       ShapeSettings
 }
 
 type ShapeSettings struct {
@@ -35,14 +33,11 @@ func (s *Settings) Validate() error {
 	if s.Path == "" {
 		return errors.New("the Path property must be set")
 	}
-	if s.Shape == "" {
-		return errors.New("the Shape property must be set")
+	if s.Delimiter == "" {
+		s.Delimiter = ","
 	}
 
-	var shape ShapeSettings
-	if err := json.Unmarshal([]byte(s.Shape), &shape); err != nil {
-		return fmt.Errorf("couldn't understand shape JSON: %s", err)
-	}
+	shape := s.Shape
 
 	if len(shape.Columns) == 0 {
 		return errors.New("shape.columns must have at least one entry")
@@ -65,8 +60,6 @@ func (s *Settings) Validate() error {
 			return fmt.Errorf("shape.columns[%d].format is required because it is a date column", i)
 		}
 	}
-
-	s.shapeSettings = shape
 
 	return nil
 }

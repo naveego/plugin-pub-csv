@@ -8,7 +8,15 @@
     "executable": "plugin-pub-csv",
     "kind": "publisher",
     "configSchema": {
-        "ui": {},
+        "ui": {
+            "ui:order": [
+                "path",
+                "archivePath",
+                "hasHeader",
+                "delimiter",
+                "shape"
+            ]
+        },
         "schema": {
             "type": "object",
             "required": [

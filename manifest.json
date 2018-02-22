@@ -3,7 +3,7 @@
     "displayName": "CSV Publisher",
     "description": "Publisher which extracts data from CSV (RFC 4180) files.",
     "versionDescription": "Version 1",
-    "version": "0.0.1",
+    "version": "2.0.0",
     "iconFile": "icon.png",
     "executable": "plugin-pub-csv.exe",
     "kind": "publisher",
@@ -29,11 +29,6 @@
                     "title": "Path",
                     "description": "Absolute path to file(s), supports *"
                 },
-                "archivePath": {
-                    "type": "string",
-                    "title": "Archive Path",
-                    "description": "If set, the publisher will move each file to this directory after it has been processed."
-                },
                 "hasHeader": {
                     "type": "boolean",
                     "title": "Has Header",
@@ -43,90 +38,6 @@
                     "type": "string",
                     "title": "Delimiter",
                     "default": ","
-                },
-                "shape": {
-                    "type": "object",
-                    "title": "Shape",
-                    "description": "Provide some information about the data in the file.",
-                    "required": [
-                        "name"
-                    ],
-                    "properties": {
-                        "name": {
-                            "type": "string",
-                            "title": "Name"
-                        },
-                        "keys": {
-                            "type": "array",
-                            "title": "Keys",
-                            "items": {
-                                "type": "string",
-                                "minLength": 1
-                            },
-                            "minItems": 1
-                        },
-                        "columns": {
-                            "type": "array",
-                            "title": "Columns",
-                            "items": {
-                                "type": "object",
-                                "title": "",
-                                "minItems": 1,
-                                "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "title": "Name"
-                                    },
-                                    "type": {
-                                        "type": "string",
-                                        "title": "Type",
-                                        "enum": [
-                                            "string",
-                                            "number",
-                                            "date"
-                                        ]
-                                    }
-                                },
-                                "required": [
-                                    "name",
-                                    "type"
-                                ],
-                                "dependencies": {
-                                    "type": {
-                                        "oneOf": [
-                                            {
-                                                "properties": {
-                                                    "type": {
-                                                        "enum": [
-                                                            "string",
-                                                            "number"
-                                                        ]
-                                                    }
-                                                }
-                                            },
-                                            {
-                                                "properties": {
-                                                    "type": {
-                                                        "enum": [
-                                                            "date"
-                                                        ]
-                                                    },
-                                                    "format": {
-                                                        "type": "string",
-                                                        "title": "Format",
-                                                        "description": "Provide the format that the date is in. For example, yyyy-MM-dd hh:mm:ss. See https://github.com/vjeantet/jodaTime for details."
-                                                    }
-                                                },
-                                                "required": [
-                                                    "format"
-                                                ]
-                                            }
-                                        ]
-                                    }
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }

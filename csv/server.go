@@ -2,14 +2,13 @@ package csv
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/vjeantet/jodaTime"
 
 	"github.com/sirupsen/logrus"
 
@@ -18,11 +17,10 @@ import (
 )
 
 type server struct {
-	mu             *sync.Mutex
-	settings       Settings
-	dataPointShape pipeline.Shape
-	publishing     bool
-	stopPublish    func()
+	mu          *sync.Mutex
+	settings    Settings
+	publishing  bool
+	stopPublish func()
 }
 
 type Server interface {
@@ -44,15 +42,7 @@ func (m *server) Init(request protocol.InitRequest) (protocol.InitResponse, erro
 		return protocol.InitResponse{}, err
 	}
 	m.settings = settings
-	m.dataPointShape = pipeline.Shape{
-		KeyNames: m.settings.Shape.Keys,
-	}
-	for _, p := range m.settings.Shape.Columns {
-		m.dataPointShape.Properties = append(m.dataPointShape.Properties, fmt.Sprintf("%s:%s", p.Name, p.Type))
-	}
-
 	return protocol.InitResponse{Success: true}, nil
-
 }
 
 func (m *server) Dispose(protocol.DisposeRequest) (protocol.DisposeResponse, error) {
@@ -87,12 +77,11 @@ func (m *server) Publish(request protocol.PublishRequest, toClient protocol.Publ
 		for _, file := range filesToProcess {
 			log := logrus.WithField("file", unmanglePath(file))
 			log.Info("Processing file.")
-			if err := m.processFile(toClient, file, log); err != nil {
+			if err := m.processFile(toClient, m.settings.Path, file, log); err != nil {
 				log.WithError(err).Error("Error while processing file.")
 				dp := pipeline.DataPoint{
 					Action: "abend",
-					Shape:  m.dataPointShape,
-					Entity: m.settings.Shape.Name,
+					Entity: m.settings.Path,
 					Meta: map[string]string{
 						"csv:error": err.Error(),
 						"csv:file":  unmanglePath(file),
@@ -112,74 +101,96 @@ func (m *server) Publish(request protocol.PublishRequest, toClient protocol.Publ
 
 }
 
-func (m *server) processFile(c protocol.PublisherClient, filePath string, log *logrus.Entry) error {
+func (m *server) streamRecordsFromFile(filePath string, limit int, records chan []string, errors chan error) {
 
-	cols := m.settings.Shape.Columns
+	defer close(records)
+	defer close(errors)
 
 	file, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("couldn't open file: %s", err)
+		errors <- fmt.Errorf("couldn't open file: %s", err)
+		return
 	}
 
 	defer file.Close()
 
 	reader := csv.NewReader(file)
-	if m.settings.HasHeader {
-		// discard the header row
-		if _, err := reader.Read(); err != nil {
-			return fmt.Errorf("error reading header: %s", err)
-		}
-	}
-	count := 0
-	for {
+
+	for count := 0; count < limit; count++ {
 		record, err := reader.Read()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("error reading from file: %s", err)
-		}
-		if len(record) != len(cols) {
-			return fmt.Errorf("record %d in file '%s' had %d columns, but %d columns are defined in shape",
-				count, unmanglePath(filePath), len(record), len(cols))
+			errors <- fmt.Errorf("error reading from file: %s", err)
+			return
 		}
 
-		dp := pipeline.DataPoint{
-			Action: "upsert",
-			Shape:  m.dataPointShape,
-			Entity: m.settings.Shape.Name,
-			Data:   make(map[string]interface{}),
-		}
+		records <- record
+	}
+}
 
-		for i, v := range record {
-			col := cols[i]
-			switch col.Type {
-			case "number":
-				if dp.Data[col.Name], err = strconv.Atoi(v); err != nil {
-					dp.Action = "malformed"
-					dp.Data[col.Name] = fmt.Sprintf("could not parse '%s' as number: %s", v, err)
+func (m *server) processFile(c protocol.PublisherClient, entityName string, filePath string, log *logrus.Entry) error {
+
+	failures := make(chan error, 1)
+	records := make(chan []string)
+
+	go m.streamRecordsFromFile(filePath, math.MaxInt64, records, failures)
+
+	var cols []string
+	var props []string
+
+	count := 0
+	for {
+		select {
+		case err := <-failures:
+			if err != nil {
+				return err
+			}
+		case record, more := <-records:
+			if !more {
+				return nil
+			}
+
+			if cols == nil {
+				if m.settings.HasHeader {
+					cols = record
+					for _, c := range cols {
+						props = append(props, c+":string")
+					}
+					continue
 				}
-			case "date":
-				if dp.Data[col.Name], err = jodaTime.Parse(col.Format, v); err != nil {
-					dp.Action = "malformed"
-					dp.Data[col.Name] = fmt.Sprintf("could not parse '%s' as date using format '%s': %s", v, col.Format, err)
+				for i := range record {
+					cols = append(cols, fmt.Sprintf("Column%d", i))
+					props = append(props, fmt.Sprintf("Column%d:string", i))
 				}
-			default:
-				dp.Data[col.Name] = v
+			}
+
+			dp := pipeline.DataPoint{
+				Action: "upsert",
+				Shape: pipeline.Shape{
+					KeyNames:   []string{},
+					Properties: props,
+				},
+				Entity: entityName,
+				Data:   make(map[string]interface{}),
+			}
+
+			for i, v := range record {
+				col := cols[i]
+				dp.Data[col] = v
+			}
+
+			c.SendDataPoints(protocol.SendDataPointsRequest{
+				DataPoints: []pipeline.DataPoint{dp},
+			})
+
+			count++
+			if count%100 == 0 {
+				log.WithField("count", count).Debug("Processing file...")
 			}
 		}
-
-		c.SendDataPoints(protocol.SendDataPointsRequest{
-			DataPoints: []pipeline.DataPoint{dp},
-		})
-
-		count++
-		if count%100 == 0 {
-			log.WithField("count", count).Debug("Processing file...")
-		}
 	}
-
-	return nil
 }
 
 func (m *server) DiscoverShapes(request protocol.DiscoverShapesRequest) (protocol.DiscoverShapesResponse, error) {
@@ -190,14 +201,55 @@ func (m *server) DiscoverShapes(request protocol.DiscoverShapesRequest) (protoco
 		return response, err
 	}
 
-	sd := pipeline.ShapeDefinition{
-		Name: settings.Shape.Name,
-		Keys: settings.Shape.Keys,
+	filesToProcess, err := getAllMatchingFiles(settings.Path)
+	if err != nil {
+		return response, err
 	}
-	for _, col := range settings.Shape.Columns {
+	if len(filesToProcess) == 0 {
+		return response, errors.New("no files found")
+	}
+
+	var samples [][]string
+
+	failures := make(chan error, 1)
+	records := make(chan []string)
+	filePath := filesToProcess[0]
+
+	go m.streamRecordsFromFile(filePath, 10, records, failures)
+
+	for record := range records {
+		samples = append(samples, record)
+	}
+
+	err = <-failures
+	if err != nil {
+		return response, fmt.Errorf("attempt to examine file result in error: %s", err)
+	}
+
+	if len(samples) == 0 {
+		return response, fmt.Errorf("examined file %q but found no rows", filePath)
+	}
+
+	sd := pipeline.ShapeDefinition{
+		Name: settings.Path,
+		Keys: []string{},
+	}
+
+	var cols []string
+
+	if settings.HasHeader {
+		cols = samples[0]
+		samples = samples[1:]
+	} else {
+		for i := range samples[0] {
+			cols = append(cols, fmt.Sprintf("Column%d", i))
+		}
+	}
+
+	for _, col := range cols {
 		sd.Properties = append(sd.Properties, pipeline.PropertyDefinition{
-			Name: col.Name,
-			Type: col.Type,
+			Name: col,
+			Type: "string",
 		})
 	}
 

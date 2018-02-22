@@ -3,7 +3,6 @@ package csv_test
 import (
 	"os"
 	"path/filepath"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -29,17 +28,6 @@ var _ = Describe("Server", func() {
 		settings = Settings{
 			Path:      csvPath,
 			HasHeader: true,
-			Shape: ShapeSettings{
-				Name: "TestShape",
-				Keys: []string{"first", "natural"},
-				Columns: []ShapeColumn{
-					{Name: "first", Type: "string"},
-					{Name: "last", Type: "string"},
-					{Name: "age", Type: "number"},
-					{Name: "date", Type: "date", Format: "MM/dd/yyyy"},
-					{Name: "natural", Type: "number"},
-				},
-			},
 		}
 	})
 
@@ -80,7 +68,7 @@ var _ = Describe("Server", func() {
 
 	Describe("Discover shapes", func() {
 
-		It("Should return shapes from settings", func() {
+		It("Should return shapes from file", func() {
 			actual, err := sut.DiscoverShapes(protocol.DiscoverShapesRequest{
 				Settings: structs.Map(settings),
 			})
@@ -88,14 +76,14 @@ var _ = Describe("Server", func() {
 			Expect(err).To(BeNil())
 			Expect(actual.Shapes[0]).To(BeEquivalentTo(
 				pipeline.ShapeDefinition{
-					Name: "TestShape",
-					Keys: []string{"first", "natural"},
+					Name: csvPath,
+					Keys: []string{},
 					Properties: []pipeline.PropertyDefinition{
 						{Name: "first", Type: "string"},
 						{Name: "last", Type: "string"},
-						{Name: "age", Type: "number"},
-						{Name: "date", Type: "date"},
-						{Name: "natural", Type: "number"},
+						{Name: "age", Type: "string"},
+						{Name: "date", Type: "string"},
+						{Name: "natural", Type: "string"},
 					},
 				}))
 		})
@@ -130,22 +118,22 @@ var _ = Describe("Server", func() {
 			}
 		})
 
-		It("Should emit data points with parsed data", func() {
+		It("Should emit data points with data as strings", func() {
 			actual := execute()
 
 			Expect(actual).To(HaveLen(3))
 
 			dp := actual[0]
-			Expect(dp.Entity).To(Equal("TestShape"))
+			Expect(dp.Entity).To(Equal(csvPath))
 			Expect(dp.Shape).To(BeEquivalentTo(pipeline.Shape{
-				KeyNames:   []string{"first", "natural"},
-				Properties: []string{"first:string", "last:string", "age:number", "date:date", "natural:number"},
+				KeyNames:   []string{},
+				Properties: []string{"first:string", "last:string", "age:string", "date:string", "natural:string"},
 			}))
 
 			expected := []map[string]interface{}{
-				{"first": "Ora", "last": "Kennedy", "age": 47, "date": time.Date(1978, 2, 9, 0, 0, 0, 0, time.UTC), "natural": 6252},
-				{"first": "Loretta", "last": "Malone", "age": 41, "date": time.Date(1980, 6, 29, 0, 0, 0, 0, time.UTC), "natural": 1990},
-				{"first": "Jon", "last": "Gray", "age": 35, "date": time.Date(1949, 12, 22, 0, 0, 0, 0, time.UTC), "natural": 4962},
+				{"first": "Ora", "last": "Kennedy", "age": "47", "date": "02/09/1978", "natural": "6252"},
+				{"first": "Loretta", "last": "Malone", "age": "41", "date": "06/29/1980", "natural": "1990"},
+				{"first": "Jon", "last": "Gray", "age": "35", "date": "12/22/1949", "natural": "4962"},
 			}
 
 			for i, dp := range actual {
@@ -183,35 +171,12 @@ var _ = Describe("Server", func() {
 			Expect(actual[0].Action).To(Equal(pipeline.DataPointAction("abend")))
 		})
 
-		It("Should emit abend when file has wrong number of columns", func() {
-			csvPath, _ = filepath.Abs("test_data/people.1.header.misconfigured.csv")
-			settings.HasHeader = true
-
-			actual := execute()
-
-			Expect(actual).To(HaveLen(1))
-			Expect(actual[0].Action).To(Equal(pipeline.DataPointAction("abend")))
-		})
-
 		It("Should handle zip correctly", func() {
 			csvPath, _ = filepath.Abs("test_data/people.2.header.zip")
 
 			actual := execute()
 
 			Expect(actual).To(HaveLen(6))
-		})
-
-		It("Should emit data points with errors when data is malformed", func() {
-			csvPath, _ = filepath.Abs("test_data/people.1.header.malformed.csv")
-
-			actual := execute()
-
-			Expect(actual).To(HaveLen(1))
-
-			dp := actual[0]
-			Expect(dp.Action).To(Equal(pipeline.DataPointAction("malformed")))
-			Expect(dp.Data["age"]).To(ContainSubstring("could not parse 'A47' as number:"))
-			Expect(dp.Data["date"]).To(ContainSubstring("could not parse '02/09/78' as date using format 'MM/dd/yyyy':"))
 		})
 
 	})

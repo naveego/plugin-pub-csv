@@ -11,10 +11,8 @@
         "ui": {
             "ui:order": [
                 "path",
-                "archivePath",
                 "hasHeader",
                 "delimiter",
-                "shape"
             ]
         },
         "schema": {

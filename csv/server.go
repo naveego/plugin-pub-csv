@@ -149,7 +149,11 @@ func (m *server) processFile(c protocol.PublisherClient, entityName string, file
 			}
 		case record, more := <-records:
 			if !more {
-				return nil
+				// make sure that if an error has been emitted we pick it up
+				// if there is no error, the channel will have been closed
+				// so we won't block
+				err := <-failures
+				return err
 			}
 
 			if cols == nil {

@@ -1,21 +1,25 @@
-package csv
+package internal
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
-
-	"github.com/mitchellh/mapstructure"
+	"path/filepath"
 )
 
 type Settings struct {
-	Path          string `json:"path"`
-	ArchivePath   string `json:"archivePath"`
-	HasHeader     bool   `json:"hasHeader"`
-	Delimiter     string `json:"delimiter"`
-	Shape         string `json:"shape"`
-	shapeSettings ShapeSettings
+	RootPath      string        `json:"rootPath"`
+	Filters       []string      `json:filters`
+	CleanupAction ArchiveAction `json:archiveAction`
+	ArchivePath   string        `json:"archivePath"`
+	HasHeader     bool          `json:"hasHeader"`
+	Delimiter     string        `json:"delimiter"`
 }
+
+type ArchiveAction string
+const (
+	CleanupNothing = ArchiveAction("nothing")
+	CleanupArchive = ArchiveAction("archive")
+	CleanupDelete  = ArchiveAction("delete")
+)
 
 type ShapeSettings struct {
 	Name    string
@@ -32,56 +36,25 @@ type ShapeColumn struct {
 // Validate returns an error if the Settings are not valid.
 // It also populates the internal fields of settings.
 func (s *Settings) Validate() error {
-	if s.Path == "" {
-		return errors.New("the Path property must be set")
-	}
-	if s.Shape == "" {
-		return errors.New("the Shape property must be set")
+	if s.RootPath == "" {
+		return errors.New("the rootPath property must be set")
 	}
 
-	var shape ShapeSettings
-	if err := json.Unmarshal([]byte(s.Shape), &shape); err != nil {
-		return fmt.Errorf("couldn't understand shape JSON: %s", err)
+	if !filepath.IsAbs(s.RootPath) {
+		return errors.New("the rootPath property must be an absolute path")
 	}
 
-	if len(shape.Columns) == 0 {
-		return errors.New("shape.columns must have at least one entry")
-	}
-	if len(shape.Keys) == 0 {
-		return errors.New("shape.keys must have at least one entry")
+	if s.CleanupAction == "" {
+		s.CleanupAction = CleanupNothing
 	}
 
-	for i, col := range shape.Columns {
-
-		if col.Name == "" {
-			return fmt.Errorf("shape.columns[%d].name is required", i)
-		}
-
-		if col.Type == "" {
-			return fmt.Errorf("shape.columns[%d].type is required", i)
-		}
-
-		if col.Type == "date" && col.Format == "" {
-			return fmt.Errorf("shape.columns[%d].format is required because it is a date column", i)
-		}
+	if len(s.Filters) == 0 {
+		s.Filters = []string{`\.csv$`}
 	}
 
-	s.shapeSettings = shape
+	if s.Delimiter == "" {
+		s.Delimiter = ","
+	}
 
 	return nil
-}
-
-func SettingsFromMap(m map[string]interface{}) (Settings, error) {
-
-	var settings Settings
-	err := mapstructure.Decode(m, &settings)
-	//fmt.Printf("map: %#v\n", m)
-	//fmt.Printf("settings: %#v\n", settings)
-
-	if err == nil {
-		err = settings.Validate()
-	}
-	//fmt.Printf("validated settings: %#v\n", settings)
-
-	return settings, err
 }

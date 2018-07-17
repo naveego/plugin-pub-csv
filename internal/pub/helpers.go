@@ -9,7 +9,53 @@ import (
 	"log"
 	"encoding/json"
 	"encoding"
+	"fmt"
 )
+
+
+func (c *Count) Format() string {
+	if c == nil {
+		return "unavailable"
+	}
+
+	switch c.Kind {
+	case Count_UNAVAILABLE:
+		return "unavailable"
+	case Count_ESTIMATE:
+		return fmt.Sprintf("~%d", c.Value)
+	case Count_EXACT:
+		return fmt.Sprintf("%d", c.Value)
+	default:
+		return fmt.Sprintf("unknown kind: %s", c.Kind)
+	}
+}
+
+func NewConnectRequest(settings interface{}) (*ConnectRequest, error) {
+	b, err := json.Marshal(settings)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &ConnectRequest{
+		SettingsJson: string(b),
+	}
+
+	return req, nil
+}
+
+func NewRecord(action Record_Action, data interface{}) (*Record, error) {
+	b, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	r := &Record{
+		Action:   action,
+		DataJson: string(b),
+	}
+
+	return r, nil
+}
 
 // NewServerPlugin returns a plugin.Plugin for use as a server.
 // This is the method to call from the plugin implementation

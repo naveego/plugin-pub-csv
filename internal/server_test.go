@@ -1,240 +1,325 @@
-package csv_test
+package internal_test
 
 import (
-	"encoding/json"
 	"os"
-	"path/filepath"
-	"time"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"github.com/fatih/structs"
-	"github.com/naveego/api/types/pipeline"
-	"github.com/naveego/navigator-go/publishers/protocol"
-	. "github.com/naveego/plugin-pub-csv/csv"
+	. "github.com/naveego/plugin-pub-csv/internal"
+	"github.com/naveego/plugin-pub-csv/internal/pub"
+	"context"
+	"google.golang.org/grpc/metadata"
+	"encoding/json"
+	"io/ioutil"
+	"path/filepath"
 )
 
 var _ = Describe("Server", func() {
 
 	var (
-		sut      Server
-		settings Settings
-		csvPath  string
+		sut      pub.PublisherServer
+		rootPath string
+		connect  func(rootPath string, filters ...string) error
 	)
 
 	BeforeEach(func() {
 		sut = NewServer()
-		csvPath, _ = filepath.Abs("test_data/people.3.header.csv")
-		shape, _ := json.Marshal(ShapeSettings{
-			Name: "TestShape",
-			Keys: []string{"first", "natural"},
-			Columns: []ShapeColumn{
-				{Name: "first", Type: "string"},
-				{Name: "last", Type: "string"},
-				{Name: "age", Type: "number"},
-				{Name: "date", Type: "date", Format: "MM/dd/yyyy"},
-				{Name: "natural", Type: "number"},
-			},
-		})
-		settings = Settings{
-			Path:      csvPath,
-			HasHeader: true,
-			Shape:     string(shape),
+		rootPath = os.ExpandEnv("$GOPATH/src/github.com/naveego/plugin-pub-csv/test/test_data")
+		// shape, _ := json.Marshal(ShapeSettings{
+		// 	Name: "TestShape",
+		// 	Keys: []string{"first", "natural"},
+		// 	Columns: []ShapeColumn{
+		// 		{Name: "first", Type: "string"},
+		// 		{Name: "last", Type: "string"},
+		// 		{Name: "age", Type: "number"},
+		// 		{Name: "date", Type: "date", Format: "MM/dd/yyyy"},
+		// 		{Name: "natural", Type: "number"},
+		// 	},
+		// })
+		connect = func(rootPath string, filters ...string) error {
+			var settings Settings
+			settings.RootPath = rootPath
+			settings.Filters = filters
+			settings.HasHeader = true
+			req, _ := pub.NewConnectRequest(settings)
+			_, err := sut.Connect(context.Background(), req)
+			return err
 		}
+	})
+
+	Describe("Validate settings", func() {
+
+		It("Should error if path is not absolute", func() {
+			settings := &Settings{RootPath:"bogus"}
+			Expect(settings.Validate()).ToNot(Succeed())
+		})
+
+		It("Should error if path is not set", func() {
+			settings := &Settings{}
+			Expect(settings.Validate()).ToNot(Succeed())
+		})
+
+		It("Should set defaults", func() {
+			settings := &Settings{RootPath:"/"}
+			Expect(settings.Validate()).To(Succeed())
+			Expect(settings.Filters).To(BeEquivalentTo([]string{`\.csv$`}))
+			Expect(settings.Delimiter).To(BeEquivalentTo(","))
+			Expect(settings.CleanupAction).To(Equal(CleanupNothing))
+		})
 	})
 
 	Describe("Test connection", func() {
 
 		It("Should error if path is not absolute", func() {
-			settings.Path = "bogus"
-			_, err := sut.TestConnection(protocol.TestConnectionRequest{
-				Settings: structs.Map(settings),
-			})
-
-			Expect(err).ToNot(BeNil())
+			Expect(connect("bogus")).ToNot(Succeed())
 		})
 
-		It("Should find file when file is present", func() {
-			settings.Path = csvPath
-
-			actual, err := sut.TestConnection(protocol.TestConnectionRequest{
-				Settings: structs.Map(settings),
-			})
-
-			Expect(err).To(BeNil())
-			Expect(actual.Success).To(BeTrue())
-			Expect(actual.Message).To(ContainSubstring(csvPath))
+		It("Should error if path is not set", func() {
+			Expect(connect("")).ToNot(Succeed())
 		})
 
-		It("Should not find file when file is not present", func() {
-			settings.Path = csvPath + ".missing"
-			actual, err := sut.TestConnection(protocol.TestConnectionRequest{
-				Settings: structs.Map(settings),
-			})
-			Expect(err).To(BeNil())
-
-			Expect(actual.Success).To(BeFalse())
+		It("Should succeed if path is valid", func() {
+			Expect(connect(rootPath)).To(Succeed())
 		})
-
 	})
 
 	Describe("Discover shapes", func() {
 
-		It("Should return shapes from settings", func() {
-			actual, err := sut.DiscoverShapes(protocol.DiscoverShapesRequest{
-				Settings: structs.Map(settings),
+		It("Should find files when files are present", func() {
+			Expect(connect(rootPath, `people\.2\.header\.\w\.csv`)).To(Succeed())
+			actual, err := sut.DiscoverShapes(context.Background(), &pub.DiscoverShapesRequest{
+				SampleSize: 5,
+				Mode:       pub.DiscoverShapesRequest_ALL,
 			})
 
-			Expect(err).To(BeNil())
-			Expect(actual.Shapes[0]).To(BeEquivalentTo(
-				pipeline.ShapeDefinition{
-					Name: "TestShape",
-					Keys: []string{"first", "natural"},
-					Properties: []pipeline.PropertyDefinition{
-						{Name: "first", Type: "string"},
-						{Name: "last", Type: "string"},
-						{Name: "age", Type: "number"},
-						{Name: "date", Type: "date"},
-						{Name: "natural", Type: "number"},
-					},
-				}))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(actual.Shapes).To(HaveLen(1))
+			shape := actual.Shapes[0]
+			Expect(shape.Count.Value).To(BeEquivalentTo(6), "should add up counts of all files")
+
+			Expect(shape.Properties).To(BeEquivalentTo([]*pub.Property{
+				{Type: pub.PropertyType_STRING, Id: "first", Name: "first"},
+				{Type: pub.PropertyType_STRING, Id: "last", Name: "last"},
+				{Type: pub.PropertyType_STRING, Id: "age", Name: "age"},
+				{Type: pub.PropertyType_STRING, Id: "date", Name: "date"},
+				{Type: pub.PropertyType_STRING, Id: "natural", Name: "natural"},
+			}))
 		})
 
+		It("Should error when when files have different schemas", func() {
+			Expect(connect(rootPath, `(people\.3\.header|pets.1.header)\.csv`)).To(Succeed())
+			_, err := sut.DiscoverShapes(context.Background(), &pub.DiscoverShapesRequest{
+				SampleSize: 5,
+				Mode:       pub.DiscoverShapesRequest_ALL,
+			})
+
+			Expect(err).To(MatchError(ContainSubstring("found multiple schemas")))
+		})
+
+		It("Should not find files when files are not present", func() {
+			Expect(connect(rootPath, "missing.file")).To(Succeed())
+			actual, err := sut.DiscoverShapes(context.Background(), &pub.DiscoverShapesRequest{
+				SampleSize: 5,
+				Mode:       pub.DiscoverShapesRequest_ALL,
+			})
+			Expect(err).To(BeNil())
+			Expect(actual.Shapes).To(BeEmpty())
+		})
 	})
 
 	Describe("Publish", func() {
 
 		var (
-			c       *client
-			execute func() []pipeline.DataPoint
+			execute func(settings Settings) ([]*pub.Record, error)
 		)
 
 		BeforeEach(func() {
-			c = newClient()
-			execute = func() []pipeline.DataPoint {
-				settings.Path = csvPath
-				Expect(sut.Init(protocol.InitRequest{
-					Settings: structs.Map(settings),
-				})).To(BeEquivalentTo(protocol.InitResponse{Success: true}))
+			execute = func(settings Settings) ([]*pub.Record, error) {
 
-				Expect(sut.Publish(protocol.PublishRequest{}, c)).ToNot(BeNil())
+				if settings.RootPath == "" {
+					settings.RootPath = rootPath
+				}
 
-				Eventually(c.done).Should(BeClosed())
+				req, _ := pub.NewConnectRequest(settings)
+				_, err := sut.Connect(context.Background(), req)
+				Expect(err).ToNot(HaveOccurred())
 
-				Expect(filepath.Glob(filepath.Join(os.TempDir(), "*", "*"+filepath.Base(csvPath)+"*"))).
-					To(HaveLen(0), "All copies should be cleaned up.")
+				discoverResponse, err := sut.DiscoverShapes(context.Background(), &pub.DiscoverShapesRequest{
+					SampleSize: 5,
+					Mode:       pub.DiscoverShapesRequest_ALL,
+				})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(len(discoverResponse.Shapes)).To(BeNumerically(">=", 1))
 
-				Expect(sut.Dispose(protocol.DisposeRequest{})).To(BeEquivalentTo(protocol.DisposeResponse{Success: true}))
+				shape := discoverResponse.Shapes[0]
 
-				return c.dataPoints
+				streams := make(chan *publisherStream)
+
+				go func() {
+					stream := new(publisherStream)
+					stream.err = sut.PublishStream(&pub.PublishRequest{
+						Shape: shape,
+					}, stream)
+
+					streams <- stream
+				}()
+
+				stream := <-streams
+
+				return stream.records, stream.err
 			}
 		})
 
-		It("Should emit data points with parsed data", func() {
-			actual := execute()
-
+		It("Should publish from file with header", func() {
+			actual, err := execute(Settings{
+				HasHeader:true,
+				Filters:[]string{"people.3.header.csv",
+			}})
+			Expect(err).ToNot(HaveOccurred())
 			Expect(actual).To(HaveLen(3))
-
-			dp := actual[0]
-			Expect(dp.Entity).To(Equal("TestShape"))
-			Expect(dp.Shape).To(BeEquivalentTo(pipeline.Shape{
-				KeyNames:   []string{"first", "natural"},
-				Properties: []string{"first:string", "last:string", "age:number", "date:date", "natural:number"},
-			}))
-
-			expected := []map[string]interface{}{
-				{"first": "Ora", "last": "Kennedy", "age": 47, "date": time.Date(1978, 2, 9, 0, 0, 0, 0, time.UTC), "natural": 6252},
-				{"first": "Loretta", "last": "Malone", "age": 41, "date": time.Date(1980, 6, 29, 0, 0, 0, 0, time.UTC), "natural": 1990},
-				{"first": "Jon", "last": "Gray", "age": 35, "date": time.Date(1949, 12, 22, 0, 0, 0, 0, time.UTC), "natural": 4962},
+			expectedData := []map[string]string {
+				{"first":"Ora","last":"Kennedy","age":"47","date":"02/09/1978","natural":"6252"},
+				{"first":"Loretta","last":"Malone","age":"41","date":"06/29/1980","natural":"1990"},
+				{"first":"Jon","last":"Gray","age":"35","date":"12/22/1949","natural":"4962"},
 			}
-
-			for i, dp := range actual {
-				Expect(dp.Data).To(BeEquivalentTo(expected[i]))
+			var expected []*pub.Record
+			for _, m := range expectedData {
+				b, _ := json.Marshal(m)
+				expected = append(expected, &pub.Record{
+					Action:pub.Record_UPSERT,
+					DataJson: string(b),
+				})
 			}
+			Expect(actual).To(BeEquivalentTo(expected))
 		})
 
-		It("Should handle header correctly", func() {
-			csvPath, _ = filepath.Abs("test_data/people.3.noheader.csv")
-			settings.HasHeader = false
-
-			actual := execute()
-
+		It("Should publish from file without header", func() {
+			actual, err := execute(Settings{
+				HasHeader:false,
+				Filters:[]string{"people.3.noheader.csv"},
+			})
+			Expect(err).ToNot(HaveOccurred())
 			Expect(actual).To(HaveLen(3))
-
-			dp := actual[0]
-			Expect(dp.Action).To(Equal(pipeline.DataPointAction("upsert")))
+			expectedData := []map[string]string {
+				{"Column1":"Ora","Column2":"Kennedy","Column3":"47","Column4":"02/09/1978","Column5":"6252"},
+				{"Column1":"Loretta","Column2":"Malone","Column3":"41","Column4":"06/29/1980","Column5":"1990"},
+				{"Column1":"Jon","Column2":"Gray","Column3":"35","Column4":"12/22/1949","Column5":"4962"},
+			}
+			var expected []*pub.Record
+			for _, m := range expectedData {
+				b, _ := json.Marshal(m)
+				expected = append(expected, &pub.Record{
+					Action:pub.Record_UPSERT,
+					DataJson: string(b),
+				})
+			}
+			Expect(actual).To(BeEquivalentTo(expected))
 		})
 
-		It("Should handle glob correctly", func() {
-			csvPath, _ = filepath.Abs("test_data/people.2.header.*.csv")
 
-			actual := execute()
+		It("Should stop when data is is malformed", func() {
+			_, err := execute(Settings{
+				HasHeader:false,
+				Filters:[]string{"people.7.header.badrecord.csv"},
+			})
 
-			Expect(actual).To(HaveLen(6))
+			Expect(err).To(HaveOccurred())
 		})
 
-		It("Should emit abend when file isn't a valid csv", func() {
-			csvPath, _ = filepath.Abs("test_data/people.nonsense.csv")
-			settings.HasHeader = true
+		Describe("cleanup", func(){
+			var (
+				root       string
+				archiveDir string
+				filter     string
+				filePath   string
+			)
+			BeforeEach(func(){
+				root, _ = ioutil.TempDir(os.TempDir(),"plugin-pub-csv")
+				archiveDir, _ = ioutil.TempDir(os.TempDir(),"plugin-pub-csv-archive")
+				filter = "data.csv"
+				filePath = filepath.Join(root, filter)
+				ioutil.WriteFile(filePath, []byte(`first,last,age,date,natural
+Ora,Kennedy,47,02/09/1978,6252
+Loretta,Malone,41,06/29/1980,1990
+Jon,Gray,35,12/22/1949,4962
+`), 0666)
+			})
+			AfterEach(func(){
+				os.RemoveAll(root)
+				os.RemoveAll(archiveDir)
+			})
 
-			actual := execute()
+			It("should not change file when cleanup is set to nothing", func(){
+				actual, err := execute(Settings{
+					HasHeader:true,
+					RootPath: root,
+					Filters:[]string{filter},
+				})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(actual).To(HaveLen(3))
+				Expect(filePath).To(BeAnExistingFile())
+			})
+			It("should delete file when cleanup is set to delete", func(){
+				actual, err := execute(Settings{
+					HasHeader:true,
+					RootPath: root,
+					Filters:[]string{filter},
+					CleanupAction:CleanupDelete,
+				})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(actual).To(HaveLen(3))
+				Expect(filePath).ToNot(BeAnExistingFile())
+			})
 
-			Expect(actual).To(HaveLen(1))
-			Expect(actual[0].Action).To(Equal(pipeline.DataPointAction("abend")))
+			It("should move file when cleanup is set to archive", func(){
+
+				actual, err := execute(Settings{
+					HasHeader:     true,
+					RootPath:      root,
+					Filters:       []string{filter},
+					CleanupAction: CleanupArchive,
+					ArchivePath:   archiveDir,
+				})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(actual).To(HaveLen(3))
+				Expect(filePath).ToNot(BeAnExistingFile())
+				archivePath := filepath.Join(archiveDir, filter)
+				Expect(archivePath).To(BeAnExistingFile())
+			})
 		})
-
-		It("Should emit abend when file has wrong number of columns", func() {
-			csvPath, _ = filepath.Abs("test_data/people.1.header.misconfigured.csv")
-			settings.HasHeader = true
-
-			actual := execute()
-
-			Expect(actual).To(HaveLen(1))
-			Expect(actual[0].Action).To(Equal(pipeline.DataPointAction("abend")))
-		})
-
-		It("Should handle zip correctly", func() {
-			csvPath, _ = filepath.Abs("test_data/people.2.header.zip")
-
-			actual := execute()
-
-			Expect(actual).To(HaveLen(6))
-		})
-
-		It("Should emit data points with errors when data is malformed", func() {
-			csvPath, _ = filepath.Abs("test_data/people.1.header.malformed.csv")
-
-			actual := execute()
-
-			Expect(actual).To(HaveLen(1))
-
-			dp := actual[0]
-			Expect(dp.Action).To(Equal(pipeline.DataPointAction("malformed")))
-			Expect(dp.Data["age"]).To(ContainSubstring("could not parse 'A47' as number:"))
-			Expect(dp.Data["date"]).To(ContainSubstring("could not parse '02/09/78' as date using format 'MM/dd/yyyy':"))
-		})
-
 	})
 
 })
 
-type client struct {
-	dataPoints []pipeline.DataPoint
-	done       chan struct{}
+type publisherStream struct {
+	records []*pub.Record
+	err     error
 }
 
-func newClient() *client {
-	return &client{
-		done: make(chan struct{}),
-	}
+func (p *publisherStream) Send(record *pub.Record) error {
+	p.records = append(p.records, record)
+	return nil
 }
 
-func (c *client) SendDataPoints(sendRequest protocol.SendDataPointsRequest) (protocol.SendDataPointsResponse, error) {
-	c.dataPoints = append(c.dataPoints, sendRequest.DataPoints...)
-	return protocol.SendDataPointsResponse{}, nil
+func (publisherStream) SetHeader(metadata.MD) error {
+	panic("implement me")
 }
-func (c *client) Done(protocol.DoneRequest) (protocol.DoneResponse, error) {
-	close(c.done)
-	return protocol.DoneResponse{}, nil
+
+func (publisherStream) SendHeader(metadata.MD) error {
+	panic("implement me")
+}
+
+func (publisherStream) SetTrailer(metadata.MD) {
+	panic("implement me")
+}
+
+func (publisherStream) Context() context.Context {
+	panic("implement me")
+}
+
+func (publisherStream) SendMsg(m interface{}) error {
+	panic("implement me")
+}
+
+func (publisherStream) RecvMsg(m interface{}) error {
+	panic("implement me")
 }

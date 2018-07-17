@@ -1,4 +1,4 @@
-package csv
+package internal
 
 import (
 	"archive/zip"

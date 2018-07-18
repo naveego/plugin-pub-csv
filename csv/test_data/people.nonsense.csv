@@ -1,2 +1,0 @@
-this isn't a csv file, it shouldn't get imported, even though, confusingly, it starts with the right number of columns
-its column count is not consistent

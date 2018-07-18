@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/naveego/navigator-go/publishers/server"
-	"github.com/naveego/plugin-pub-csv/csv"
+	"github.com/naveego/plugin-pub-csv/internal"
 	"github.com/naveego/plugin-pub-csv/version"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"log"
+	"github.com/hashicorp/go-plugin"
+	"github.com/naveego/dataflow-contracts/plugins"
+	"github.com/naveego/plugin-pub-csv/internal/pub"
 )
 
 var verbose *bool
@@ -22,24 +24,22 @@ var RootCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Long: fmt.Sprintf(`Version %s
 Runs the publisher in externally controlled mode.`, version.Version.String()),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string)  {
 
-		logrus.SetOutput(os.Stdout)
+		log.Print("Starting CSV Publisher Plugin.")
+		plugin.Serve(&plugin.ServeConfig{
+			HandshakeConfig: plugin.HandshakeConfig{
+				ProtocolVersion: plugins.PublisherProtocolVersion,
+				MagicCookieKey:plugins.PublisherMagicCookieKey,
+				MagicCookieValue:plugins.PublisherMagicCookieValue,
+			},
+			Plugins: map[string]plugin.Plugin{
+				"publisher": pub.NewServerPlugin(internal.NewServer()),
+			},
 
-		addr := args[0]
-
-		if *verbose {
-			fmt.Println("Verbose logging")
-			logrus.SetLevel(logrus.DebugLevel)
-		}
-
-		publisher := csv.NewServer()
-
-		srv := server.NewPublisherServer(addr, publisher)
-
-		err := srv.ListenAndServe()
-
-		return err
+			// A non-nil value here enables gRPC serving for this plugin...
+			GRPCServer: plugin.DefaultGRPCServer,
+		})
 	}}
 
 func Execute() {

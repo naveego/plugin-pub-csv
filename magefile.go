@@ -7,14 +7,14 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"regexp"
 	"time"
 
 	"github.com/naveego/plugin-pub-csv/version"
 
-	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
+	"github.com/naveego/dataflow-contracts/plugins"
+
 )
 
 var oses = []string{"windows", "linux", "darwin"}
@@ -25,7 +25,6 @@ var oses = []string{"windows", "linux", "darwin"}
 
 // A build step that requires additional params, or platform specific steps for example
 func Build() error {
-	mg.Deps(InstallDeps)
 	fmt.Println("Building...")
 	for _, os := range oses {
 		if err := buildForOS(os); err != nil {
@@ -99,22 +98,15 @@ func replaceInFile(file, regex, replacement string) (string, error) {
 	return string(input), err
 }
 
-// A custom install step if you need your bin someplace other than go/bin
-func Install() error {
-	mg.Deps(Build)
-	fmt.Println("Installing...")
-	return os.Rename("./MyApp", "/usr/bin/MyApp")
-}
-
-// Manage your deps, or running package managers.
-func InstallDeps() error {
-	fmt.Println("Installing Deps...")
-	cmd := exec.Command("go", "get", "github.com/stretchr/piglatin")
-	return cmd.Run()
-}
-
 // Clean up after yourself
 func Clean() {
 	fmt.Println("Cleaning...")
 	os.RemoveAll("bin")
+}
+
+
+
+func GenerateGRPC() error {
+	destDir := "./internal/pub"
+	return plugins.GeneratePublisher(destDir)
 }

@@ -2,40 +2,94 @@
     "name": "pub-csv",
     "displayName": "CSV Publisher",
     "description": "Publisher which extracts data from CSV (RFC 4180) files.",
-    "versionDescription": "Version 1",
-    "version": "0.0.1",
+    "versionDescription": "Version 3",
+    "version": "3.0.0",
     "iconFile": "icon.png",
     "executable": "plugin-pub-csv",
     "kind": "publisher",
-    "configSchema": [
-        {
-            "name": "path",
-            "label": "Path",
-            "help": "Absolute path to file(s), supports *",
-            "type": "string"
+    "configSchema": {
+        "ui": {
         },
-        {
-            "name": "archivePath",
-            "label": "Archive Path",
-            "help": "If set, the publisher will move each file to this directory after it has been processed.",
-            "type": "string"
-        },
-        {
-            "name": "hasHeader",
-            "label": "File has header row",
-            "type": "checkbox"
-        },
-        {
-            "name": "delimiter",
-            "label": "Delimiter",
-            "type": "string",
-            "default": ","
-        },
-        {
-            "name": "shape",
-            "label": "Shape",
-            "help": "{    \"name\": \"Name\",    \"keys\": [\"a\",\"b\"],    \"properties\": [        { \"name\": \"x\", \"type\":\"date\", \"format\": \"MM/dd/yyyy\" },    ]}",
-            "type": "shape"
+        "schema": {
+            "$id": "https://github.com/naveego/plugin-pub-csv",
+            "type": "object",
+            "properties": {
+                "rootPath": {
+                    "$id": "/properties/rootPath",
+                    "type": "string",
+                    "title": "Root Path",
+                    "description": "The folder containing CSV files.",
+                    "default": "",
+                    "examples": [
+                        "string"
+                    ]
+                },
+                "filters": {
+                    "$id": "/properties/filters",
+                    "type": "array",
+                    "items": {
+                        "$id": "/properties/filters/items",
+                        "type": "string",
+                        "title": "File filter",
+                        "description": "A regular expression used to select which files to process.",
+                        "default": "\\.csv$",
+                        "examples": [
+                            "\\.csv$"
+                        ]
+                    }
+                },
+                "cleanupAction": {
+                    "$id": "/properties/cleanupAction",
+                    "type": "string",
+                    "title": "Cleanup Action",
+                    "description": "Action taken to clean up after processing.",
+                    "default": "nothing",
+                    "examples": [
+                        "string"
+                    ],
+                    "enum": [
+                        "nothing",
+                        "delete",
+                        "archive"
+                    ]
+                },
+                "archivePath": {
+                    "$id": "/properties/archivePath",
+                    "type": "string",
+                    "title": "Archive Folder",
+                    "description": "The folder to move files to after processing, if cleanup action is \"archive\".",
+                    "default": "",
+                    "examples": [
+                        "string"
+                    ]
+                },
+                "hasHeader": {
+                    "$id": "/properties/hasHeader",
+                    "type": "boolean",
+                    "title": "Has Header ",
+                    "description": "Does the file have a header row?",
+                    "default": false,
+                    "examples": [
+                        true
+                    ]
+                },
+                "delimiter": {
+                    "$id": "/properties/delimiter",
+                    "type": "string",
+                    "title": "Delimiter",
+                    "description": "The delimiter for CSV files.",
+                    "default": ",",
+                    "examples": [
+                        ","
+                    ],
+                    "minLength": 1,
+                    "maxLength": 1,
+                    "pattern": ""
+                }
+            },
+            "required": [
+                "rootPath"
+            ]
         }
-    ]
+    }
 }

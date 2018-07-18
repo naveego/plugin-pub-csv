@@ -1,0 +1,10 @@
+first,last,age,date,natural
+Ora,Kennedy,47,02/09/1978,6252
+Loretta,Malone,41,06/29/1980,1990
+Jon,Gray,35,12/22/1949,4962
+Ora,Kennedy,47,02/09/1978,6252
+Loretta,Malone,41,06/29/1980,1990
+Jon,Gray,35,12/22/1949,4962
+Ora,Kennedy,47,02/09/1978,6252
+Loretta,Malone,41,06/29/1980,1990,invalid col
+Jon,Gray,35,12/22/1949,4962

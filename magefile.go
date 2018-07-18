@@ -4,20 +4,18 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
 	"os"
-	"regexp"
-	"time"
-
-	"github.com/naveego/plugin-pub-csv/version"
-
 	"github.com/magefile/mage/sh"
 	"github.com/naveego/dataflow-contracts/plugins"
 
+	"github.com/naveego/ci/go/build"
 )
 
-var oses = []string{"windows", "linux", "darwin"}
+var oses = []string{
+	"windows",
+	"linux",
+	"darwin",
+}
 
 // Default target to run when none is specified
 // If not set, running mage will list available targets
@@ -43,16 +41,8 @@ func buildForOS(os string) error {
 
 func PublishToNavget() error {
 
-	ver := fmt.Sprintf(`"version": "%s",`, version.Version.String())
-
-	manifest, err := replaceInFile("manifest.json", `"version":.*,`, ver)
-	if err != nil {
-		return err
-	}
-	defer ioutil.WriteFile("manifest.json", []byte(manifest), 0777)
-
 	for _, os := range oses {
-		if err = buildAndPublish(os); err != nil {
+		if err := buildAndPublish(os); err != nil {
 			return err
 		}
 	}
@@ -61,8 +51,13 @@ func PublishToNavget() error {
 }
 
 func buildAndPublish(os string) error {
+
+	navget, err := build.NewNavgetClient()
+	if err != nil {
+		return err
+	}
+
 	defer sh.Rm("plugin-pub-csv")
-	defer sh.Rm("package.zip")
 
 	env := map[string]string{
 		"GOOS":        os,
@@ -73,30 +68,16 @@ func buildAndPublish(os string) error {
 		return err
 	}
 
-	if err := sh.Run("navget-cli", "publish", "--os", os, "-f", "plugin-pub-csv icon.png"); err != nil {
-		log.Printf("Error publishing plugin. Will wait 5 seconds and try again. Error was: %s", err)
-		<-time.After(time.Second * 5)
-		if err = sh.Run("navget-cli", "publish", "--os", os, "-f", "plugin-pub-csv icon.png"); err != nil {
-			return err
-		}
-		return err
-	}
+	err = navget.Upload(build.NavgetParams{
+		Arch:"amd64",
+		OS:os,
+		Files:[]string{"plugin-pub-csv", "icon.png"},
+	})
 
-	return nil
+	return err
 }
 
-func replaceInFile(file, regex, replacement string) (string, error) {
-	input, err := ioutil.ReadFile(file)
-	if err != nil {
-		return "", err
-	}
-	re := regexp.MustCompile(regex)
 
-	output := re.ReplaceAllString(string(input), replacement)
-
-	err = ioutil.WriteFile(file, []byte(output), 0644)
-	return string(input), err
-}
 
 // Clean up after yourself
 func Clean() {

@@ -9,6 +9,11 @@ import (
 	"github.com/naveego/dataflow-contracts/plugins"
 
 	"github.com/naveego/ci/go/build"
+	"encoding/json"
+	"path/filepath"
+	"io/ioutil"
+	"encoding/base64"
+	"github.com/naveego/plugin-pub-csv/version"
 )
 
 var oses = []string{
@@ -32,7 +37,6 @@ func Build() error {
 	return nil
 }
 
-
 func buildForOS(os string) error {
 	fmt.Println("Building for OS", os)
 
@@ -45,7 +49,6 @@ func buildForOS(os string) error {
 	if err != nil {
 		return err
 	}
-
 
 	v := version.Version
 	manifest["version"] = v
@@ -71,7 +74,7 @@ func buildForOS(os string) error {
 		iconBytes, _ := ioutil.ReadFile(iconFile)
 		iconBytes64 := base64.StdEncoding.EncodeToString(iconBytes)
 		ext := filepath.Ext(iconFile)
-		icon64 := fmt.Sprintf("data:image/%s;base64,%s",ext, iconBytes64)
+		icon64 := fmt.Sprintf("data:image/%s;base64,%s", ext, iconBytes64)
 		manifest["icon"] = icon64
 	}
 
@@ -113,23 +116,19 @@ func buildAndPublish(os string) error {
 	}
 
 	err = navget.Upload(build.NavgetParams{
-		Arch:"amd64",
-		OS:os,
-		Files:[]string{"plugin-pub-csv", "icon.png"},
+		Arch:  "amd64",
+		OS:    os,
+		Files: []string{"plugin-pub-csv", "icon.png"},
 	})
 
 	return err
 }
-
-
 
 // Clean up after yourself
 func Clean() {
 	fmt.Println("Cleaning...")
 	os.RemoveAll("bin")
 }
-
-
 
 func GenerateGRPC() error {
 	destDir := "./internal/pub"

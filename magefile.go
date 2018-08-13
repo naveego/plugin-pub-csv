@@ -53,13 +53,13 @@ func buildForOS(os string) error {
 	v := version.Version
 	manifest["version"] = v
 
-	exe := "pub-mssql"
+	exe := "pub-csv"
 	if os == "windows" {
 		exe += ".exe"
 	}
 	manifest["executable"] = exe
 
-	outDir := fmt.Sprintf("build/outputs/%s/pub-mssql/%s", os, v)
+	outDir := fmt.Sprintf("build/outputs/%s/pub-csv/%s", os, v)
 	out := filepath.Join(outDir, exe)
 
 	err = sh.RunWith(map[string]string{

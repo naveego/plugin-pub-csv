@@ -1,4 +1,4 @@
-package plugin_pub_csv
+package main
 
 import "github.com/naveego/plugin-pub-csv/cmd"
 

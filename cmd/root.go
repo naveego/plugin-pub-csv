@@ -21,7 +21,6 @@ var verbose *bool
 var RootCmd = &cobra.Command{
 	Use:   "plugin-pub-csv",
 	Short: "A publisher that pulls data from a CSV file.",
-	Args:  cobra.ExactArgs(1),
 	Long: fmt.Sprintf(`Version %s
 Runs the publisher in externally controlled mode.`, version.Version.String()),
 	Run: func(cmd *cobra.Command, args []string)  {

@@ -27,10 +27,23 @@ type Server struct {
 	settings       *Settings
 	dataPointShape pipeline.Shape
 	publishing     bool
-	disconnected  bool
+	disconnected  chan struct{}
+}
+
+func (s *Server) getSettingsAndDisconnector() (*Settings, chan struct{}){
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.settings == nil || s.disconnected == nil {
+		return nil, nil
+	}
+	return s.settings, s.disconnected
 }
 
 func (s *Server) Connect(ctx context.Context, req *pub.ConnectRequest) (*pub.ConnectResponse, error) {
+
+	s.disconnect()
+	s.disconnected = make(chan struct{})
+
 	s.settings = nil
 
 	settings := new(Settings)
@@ -42,8 +55,6 @@ func (s *Server) Connect(ctx context.Context, req *pub.ConnectRequest) (*pub.Con
 		return nil, err
 	}
 	s.settings = settings
-	s.disconnected = false
-
 
 	return new(pub.ConnectResponse), nil
 }
@@ -126,9 +137,18 @@ func (s *Server) PublishStream(req *pub.PublishRequest, stream pub.Publisher_Pub
 }
 
 func (s *Server) Disconnect(context.Context, *pub.DisconnectRequest) (*pub.DisconnectResponse, error) {
-	s.disconnected = true
+	s.disconnect()
 	return new(pub.DisconnectResponse), nil
 }
+
+func (s *Server) disconnect() {
+
+	_, disconnected := s.getSettingsAndDisconnector()
+	if disconnected != nil {
+		close(disconnected)
+	}
+}
+
 
 // NewServer creates a new publisher Server.
 func NewServer() pub.PublisherServer {
@@ -159,7 +179,9 @@ func (s *Server) publishRecordsFromFile(path string, shape *pub.Shape, stream pu
 
 	reader := csv.NewReader(file)
 
-	if s.settings.HasHeader {
+	settings, disconnected := s.getSettingsAndDisconnector()
+
+	if settings.HasHeader {
 		_, err = reader.Read()
 		if err != nil {
 			return err
@@ -167,7 +189,12 @@ func (s *Server) publishRecordsFromFile(path string, shape *pub.Shape, stream pu
 		i++
 	}
 
-	for !s.disconnected {
+	for {
+		select{
+		case <-disconnected:
+			return errNotConnected
+		default:
+		}
 
 		row, err = reader.Read()
 		i++
@@ -320,13 +347,26 @@ func calculateCount(file *os.File) (*pub.Count, error) {
 }
 
 func (s *Server) findFiles() ([]string, error) {
-	if s.settings == nil {
+	settings, disconnected := s.getSettingsAndDisconnector()
+
+	if settings == nil {
 		return nil, errNotConnected
+	}
+
+	select{
+	case <-disconnected:
+		return nil, errNotConnected
+	default:
 	}
 
 	var files []string
 
-	filepath.Walk(s.settings.RootPath, func(path string, info os.FileInfo, err error) error {
+	filepath.Walk(settings.RootPath, func(path string, info os.FileInfo, err error) error {
+		select{
+		case <-disconnected:
+			return errNotConnected
+		default:
+		}
 		var matched = false
 		for _, f := range s.settings.Filters {
 			if matched, _ = regexp.MatchString(f, path); matched {

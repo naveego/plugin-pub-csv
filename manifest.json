@@ -1,5 +1,5 @@
 {
-    "name": "pub-csv",
+    "id": "pub-csv",
     "displayName": "CSV Publisher",
     "description": "Publisher which extracts data from CSV (RFC 4180) files.",
     "versionDescription": "Version 3",
@@ -7,8 +7,11 @@
     "iconFile": "icon.png",
     "executable": "plugin-pub-csv",
     "kind": "publisher",
+    "os":"$GOOS",
+    "arch":"$GOARCH",
     "configSchema": {
         "ui": {
+            "ui:order":["rootPath", "hasHeader", "delimiter","filters","cleanupAction","archivePath"]
         },
         "schema": {
             "$id": "https://github.com/naveego/plugin-pub-csv",
@@ -27,11 +30,10 @@
                 "filters": {
                     "$id": "/properties/filters",
                     "type": "array",
+                    "description": "Filters used to select files beneath the root path. Each filter should be a regular expression.",
                     "items": {
                         "$id": "/properties/filters/items",
                         "type": "string",
-                        "title": "File filter",
-                        "description": "A regular expression used to select which files to process.",
                         "default": "\\.csv$",
                         "examples": [
                             "\\.csv$"

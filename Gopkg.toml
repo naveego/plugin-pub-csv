@@ -20,8 +20,6 @@
 #  name = "github.com/x/y"
 #  version = "2.4.0"
 
-ignored = ["github.com/naveego/ci/go/build"]
-
 [[constraint]]
   branch = "master"
   name = "github.com/naveego/navigator-go"
@@ -41,3 +39,7 @@ ignored = ["github.com/naveego/ci/go/build"]
 [[constraint]]
   name = "github.com/spf13/cobra"
   version = "0.0.1"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/naveego/ci"

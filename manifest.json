@@ -3,7 +3,7 @@
     "displayName": "CSV Publisher",
     "description": "Publisher which extracts data from CSV (RFC 4180) files.",
     "versionDescription": "Version 3",
-    "version": "3.0.0",
+    "version": "3.0.2",
     "iconFile": "icon.png",
     "executable": "plugin-pub-csv",
     "kind": "publisher",

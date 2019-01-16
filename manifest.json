@@ -1,5 +1,5 @@
 {
-    "id": "pub-csv",
+    "id": "plugin-pub-csv",
     "displayName": "CSV Publisher",
     "description": "Publisher which extracts data from CSV (RFC 4180) files.",
     "versionDescription": "Version 3",

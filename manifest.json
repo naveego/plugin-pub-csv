@@ -9,6 +9,7 @@
     "kind": "publisher",
     "os":"$GOOS",
     "arch":"$GOARCH",
+    "canConfigureRealTime": true,
     "configSchema": {
         "ui": {
             "ui:order":["rootPath", "hasHeader", "delimiter","filters","cleanupAction","archivePath"]

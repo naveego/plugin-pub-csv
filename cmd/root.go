@@ -4,6 +4,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/hashicorp/go-hclog"
 	"os"
 
 	"github.com/naveego/plugin-pub-csv/internal"
@@ -33,7 +34,12 @@ Runs the publisher in externally controlled mode.`, version.Version.String()),
 				MagicCookieValue:plugins.PublisherMagicCookieValue,
 			},
 			Plugins: map[string]plugin.Plugin{
-				"publisher": pub.NewServerPlugin(internal.NewServer()),
+				"publisher": pub.NewServerPlugin(internal.NewServer(
+					hclog.New(&hclog.LoggerOptions{
+						Level:      hclog.Trace,
+						Output:     os.Stderr,
+						JSONFormat: true,
+					}))),
 			},
 
 			// A non-nil value here enables gRPC serving for this plugin...

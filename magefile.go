@@ -6,6 +6,7 @@ import (
 	"github.com/naveego/ci/go/build"
 	"github.com/naveego/dataflow-contracts/plugins"
 	"github.com/naveego/plugin-pub-csv/version"
+	"os"
 )
 
 func Build() error {
@@ -27,6 +28,11 @@ func Build() error {
 	return err
 }
 
+
+func PublishBlue() error {
+	os.Setenv("UPLOAD", "blue")
+	return Build()
+}
 
 func GenerateGRPC() error {
 	destDir := "./internal/pub"
